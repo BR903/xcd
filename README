@@ -1,0 +1,40 @@
+  About This Program
+
+This program provides a colorized version of xxd(1), assigning colors
+to byte values found in the input, thus making it easier to see
+patterns of repeated values.
+
+The source code also provides a very simple example of using the
+tinfo library to inject control codes into standard output, without
+having to conform to curses's presentation-based API.
+
+
+  Building and Installing
+
+To build, simply run "make". The resulting executable runs standalone.
+If you wish to install the program to a shared location, just use
+cp(1).
+
+
+  License
+
+Copyright (C) 2018 Brian Raiter <breadbox@muppetlabs.com>
+
+Permission is hereby granted, free of charge, to any person obtaining
+a copy of this software and associated documentation files (the
+"Software"), to deal in the Software without restriction, including
+without limitation the rights to use, copy, modify, merge, publish,
+distribute, sublicense, and/or sell copies of the Software, and to
+permit persons to whom the Software is furnished to do so, subject to
+the following conditions:
+
+The above copyright notice and this permission notice shall be
+included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
