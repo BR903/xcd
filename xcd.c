@@ -50,16 +50,17 @@ static char const *yowzitch =
     "  -g, --group=N         Display N bytes per groups [default=2]\n"
     "  -l, --limit=N         Stop after N bytes of input\n"
     "  -s, --start=N         Start dump at N bytes after start of file\n"
-    "  -n, --no-color        Suppress color output\n"
+    "  -a, --autoskip        Omit lines of zero bytes with a single \"*\"\n"
+    "  -N, --no-color        Suppress color output\n"
     "  -R, --raw             Dump colorized bytes without the hex display\n"
-    "  -a, --ascii           Don't use Unicode characters in text column\n"
+    "  -A, --ascii           Don't use Unicode characters in text column\n"
     "      --help            Display this help and exit\n"
     "      --version         Display version information and exit\n";
 
 /* Version information.
  */
 static char const *vourzhon =
-    "xcd: v1.1\n"
+    "xcd: v1.2\n"
     "Copyright (C) 2018 by Brian Raiter <breadbox@muppetlabs.com>\n"
     "This is free software; you are free to change and redistribute it.\n"
     "There is NO WARRANTY, to the extent permitted by law.\n";
@@ -348,6 +349,10 @@ typedef struct state {
     FILE *currentfile;  /* handle to the currently open input file */
 } state;
 
+/* True if the program should skip repeated lines of zero bytes.
+ */
+static int autoskip = 0;
+
 /* Number of bytes to display per line of dump output. (The default
  * value is 16, which produces output that fits comfortably on an
  * 80-column display.)
@@ -602,6 +607,9 @@ static void initoutput(void)
     seq = tigetstr("is3");
     if (seq)
         fputs(seq, stdout);
+
+    palette[0] = colorset[0];
+    nextcolorfromset = 1;
 }
 
 /*
@@ -682,41 +690,87 @@ static void renderlinecolored(byte const *buf, int count, int pos)
  * The main program functions.
  */
 
+/* Display a single line of a hexdump appropriate in the requested
+ * format.
+ */
+static void dumpline(byte const *buf, int count, int pos)
+{
+    if (count) {
+	if (!hexoutput)
+	    renderbytescolored(buf, count);
+	else if (colorize)
+	    renderlinecolored(buf, count, pos);
+	else
+	    renderlineuncolored(buf, count, pos);
+    }
+}
+
+/* Display some hexdump lines consisting entirely of zero bytes. If
+ * count is three or more, all but the first are elided.
+ */
+static void dumpzerolines(int count, int pos)
+{
+    static byte zeroline[256];
+    int i;
+
+    if (count > 2) {
+	dumpline(zeroline, linesize, pos);
+	printf("*\n");
+    } else {
+	for (i = 0 ; i < count ; ++i)
+	    dumpline(zeroline, linesize, pos + i * linesize);
+    }
+}
+
 /* Display hexdump lines from the given filenames until there's no
- * more input.
+ * more input. Lines are checked for the presence of nonzero bytes. If
+ * autoskip is enabled, all-zero lines are deferred until a nonzero
+ * byte is seen (or until the end of the file is reached).
  */
 static void dump(state *s)
 {
     byte    line[256];
+    int     linesheld = 0, lastheldsize = 0, holdpos = 0;
     int     ch = 0, pos = 0;
-    int     n;
+    int     nonzero, n;
 
     hexwidth = 2 * linesize + (linesize + groupsize - 1) / groupsize;
-    if (colorize) {
-        palette[0] = colorset[0];
-        nextcolorfromset = 1;
-    }
 
     for (pos = 0 ; ch != EOF && pos < s->startoffset ; ++pos)
         ch = nextbyte(s);
 
     while (ch != EOF && s->maxinputlen > 0) {
+	nonzero = 0;
         for (n = 0 ; n < linesize && s->maxinputlen > 0 ; ++n) {
             ch = nextbyte(s);
             if (ch == EOF)
                 break;
             line[n] = ch;
+	    nonzero |= ch;
             --s->maxinputlen;
         }
-        if (n) {
-            if (!hexoutput)
-                renderbytescolored(line, n);
-            else if (colorize)
-                renderlinecolored(line, n, pos);
-            else
-                renderlineuncolored(line, n, pos);
-        }
+	if (n == 0)
+	    break;
+	if (autoskip) {
+	    if (nonzero) {
+		dumpzerolines(linesheld, holdpos);
+		dumpline(line, n, pos);
+		linesheld = 0;
+	    } else {
+		if (linesheld == 0)
+		    holdpos = pos;
+		++linesheld;
+		lastheldsize = n;
+	    }
+        } else {
+	    dumpline(line, n, pos);
+	}
         pos += n;
+    }
+
+    if (linesheld) {
+	dumpzerolines(linesheld - 1, holdpos);
+	dumpline(line, lastheldsize, pos - lastheldsize);
     }
 }
 
@@ -727,15 +781,16 @@ static void dump(state *s)
 static void parsecommandline(int argc, char *argv[], state *s)
 {
     static char *defaultargs[] = { "-", NULL };
-    static char const *optstring = "ac:g:l:nRs:";
+    static char const *optstring = "Aac:g:l:NRs:";
     static struct option options[] = {
         { "count", required_argument, NULL, 'c' },
         { "group", required_argument, NULL, 'g' },
         { "limit", required_argument, NULL, 'l' },
         { "start", required_argument, NULL, 's' },
-        { "no-color", no_argument, NULL, 'n' },
+	{ "autoskip", no_argument, NULL, 'a' },
+        { "no-color", no_argument, NULL, 'N' },
         { "raw", no_argument, NULL, 'R' },
-        { "ascii", no_argument, NULL, 'a' },
+        { "ascii", no_argument, NULL, 'A' },
         { "help", no_argument, NULL, 'h' },
         { "version", no_argument, NULL, 'v' },
         { 0, 0, 0, 0 }
@@ -754,16 +809,20 @@ static void parsecommandline(int argc, char *argv[], state *s)
           case 's':     s->startoffset = getn(optarg, "start", 0);  break;
           case 'c':     linesize = getn(optarg, "count", 255);      break;
           case 'g':     groupsize = getn(optarg, "group", 0);       break;
-          case 'n':     colorize = 0;                               break;
+          case 'a':     autoskip = 1;                               break;
+          case 'N':     colorize = 0;                               break;
           case 'R':     hexoutput = 0;                              break;
-          case 'a':     useunicode = 0;                             break;
+          case 'A':     useunicode = 0;                             break;
           case 'h':     fputs(yowzitch, stdout);                    exit(0);
           case 'v':     fputs(vourzhon, stdout);                    exit(0);
           default:      die("Try --help for more information.");
         }
     }
-    if (!colorize && !hexoutput)
-        die("cannot use both --raw and --no-color.");
+    if (!hexoutput) {
+	autoskip = 0;
+	if (!colorize)
+	    die("cannot use both --raw and --no-color.");
+    }
     if (linesize == 0)
         linesize = 16;
     if (groupsize == 0)

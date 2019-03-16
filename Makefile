@@ -1,3 +1,4 @@
+CC = gcc
 CFLAGS = -Wall -Wextra -O2
 LDFLAGS = -Wall -Wextra -O2 -s
 LOADLIBES = -ltinfo
