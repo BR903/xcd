@@ -687,7 +687,7 @@ static void renderlinecolored(byte const *buf, int count, int pos)
 }
 
 /*
- * The main program functions.
+ * The line output functions.
  */
 
 /* Display a single line of a hexdump appropriate in the requested
@@ -696,12 +696,12 @@ static void renderlinecolored(byte const *buf, int count, int pos)
 static void dumpline(byte const *buf, int count, int pos)
 {
     if (count) {
-	if (!hexoutput)
-	    renderbytescolored(buf, count);
-	else if (colorize)
-	    renderlinecolored(buf, count, pos);
-	else
-	    renderlineuncolored(buf, count, pos);
+        if (!hexoutput)
+            renderbytescolored(buf, count);
+        else if (colorize)
+            renderlinecolored(buf, count, pos);
+        else
+            renderlineuncolored(buf, count, pos);
     }
 }
 
@@ -714,69 +714,107 @@ static void dumpzerolines(int count, int pos)
     int i;
 
     if (count > 2) {
-	dumpline(zeroline, linesize, pos);
-	printf("*\n");
+        dumpline(zeroline, linesize, pos);
+        printf("*\n");
     } else {
-	for (i = 0 ; i < count ; ++i)
-	    dumpline(zeroline, linesize, pos + i * linesize);
+        for (i = 0 ; i < count ; ++i)
+            dumpline(zeroline, linesize, pos + i * linesize);
     }
 }
 
 /* Display hexdump lines from the given filenames until there's no
- * more input. Lines are checked for the presence of nonzero bytes. If
- * autoskip is enabled, all-zero lines are deferred until a nonzero
- * byte is seen (or until the end of the file is reached).
+ * more input.
  */
-static void dump(state *s)
+static void dumpfiles(state *s, int pos)
 {
     byte    line[256];
-    int     linesheld = 0, lastheldsize = 0, holdpos = 0;
-    int     ch = 0, pos = 0;
-    int     nonzero, n;
-
-    hexwidth = 2 * linesize + (linesize + groupsize - 1) / groupsize;
-
-    for (pos = 0 ; ch != EOF && pos < s->startoffset ; ++pos)
-        ch = nextbyte(s);
+    int     ch = 0, n;
 
     while (ch != EOF && s->maxinputlen > 0) {
-	nonzero = 0;
         for (n = 0 ; n < linesize && s->maxinputlen > 0 ; ++n) {
             ch = nextbyte(s);
             if (ch == EOF)
                 break;
             line[n] = ch;
-	    nonzero |= ch;
             --s->maxinputlen;
         }
-	if (n == 0)
-	    break;
-	if (autoskip) {
-	    if (nonzero) {
-		dumpzerolines(linesheld, holdpos);
-		dumpline(line, n, pos);
-		linesheld = 0;
-	    } else {
-		if (linesheld == 0)
-		    holdpos = pos;
-		++linesheld;
-		lastheldsize = n;
-	    }
+        if (n == 0)
+            break;
+        dumpline(line, n, pos);
+        pos += n;
+    }
+}
+
+/* Display hexdump lines from the given filenames until there's no
+ * more input. Lines are checked for the presence of nonzero bytes,
+ * and lines that are all zeroes are deferred until a nonzero byte is
+ * found. At that point, if three or more lines of zeroes were found,
+ * all but the first are omitted. If the end of input is reached while
+ * searching for a nonzero byte, then all but the first and last line
+ * are omitted.
+ */
+static void dumpfileswithautoskip(state *s, int pos)
+{
+    byte    line[256];
+    int     linesheld = 0, lastheldsize = 0, holdpos = 0;
+    int     nonzero, ch, n;
+
+    while (ch != EOF && s->maxinputlen > 0) {
+        nonzero = 0;
+        for (n = 0 ; n < linesize && s->maxinputlen > 0 ; ++n) {
+            ch = nextbyte(s);
+            if (ch == EOF)
+                break;
+            line[n] = ch;
+            nonzero |= ch;
+            --s->maxinputlen;
+        }
+        if (n == 0)
+            break;
+        if (nonzero) {
+            if (linesheld) {
+                dumpzerolines(linesheld, holdpos);
+                linesheld = 0;
+            }
+            dumpline(line, n, pos);
         } else {
-	    dumpline(line, n, pos);
-	}
+            if (linesheld == 0)
+                holdpos = pos;
+            ++linesheld;
+            lastheldsize = n;
+        }
         pos += n;
     }
 
     if (linesheld) {
-	dumpzerolines(linesheld - 1, holdpos);
-	dumpline(line, lastheldsize, pos - lastheldsize);
+        dumpzerolines(linesheld - 1, holdpos);
+        dumpline(line, lastheldsize, pos - lastheldsize);
     }
 }
 
+/* Move the input stream to the starting point and then 
+ */
+static void dump(state *s)
+{
+    int pos;
+
+    for (pos = 0 ; pos < s->startoffset ; ++pos)
+        if (nextbyte(s) == EOF)
+	    return;
+
+    if (autoskip)
+        dumpfileswithautoskip(s, pos);
+    else
+        dumpfiles(s, pos);
+}
+
+/*
+ * The top-level functions.
+ */
+
 /* Parse the command-line arguments and initialize the given state
- * appropriately. Invalid arguments will cause the program to
- * terminate.
+ * appropriately, as well as default values. Invalid arguments (or
+ * invalid combinations of arguments) will cause the program to exit.
  */
 static void parsecommandline(int argc, char *argv[], state *s)
 {
@@ -787,7 +825,7 @@ static void parsecommandline(int argc, char *argv[], state *s)
         { "group", required_argument, NULL, 'g' },
         { "limit", required_argument, NULL, 'l' },
         { "start", required_argument, NULL, 's' },
-	{ "autoskip", no_argument, NULL, 'a' },
+        { "autoskip", no_argument, NULL, 'a' },
         { "no-color", no_argument, NULL, 'N' },
         { "raw", no_argument, NULL, 'R' },
         { "ascii", no_argument, NULL, 'A' },
@@ -819,14 +857,17 @@ static void parsecommandline(int argc, char *argv[], state *s)
         }
     }
     if (!hexoutput) {
-	autoskip = 0;
-	if (!colorize)
-	    die("cannot use both --raw and --no-color.");
+        autoskip = 0;
+        if (!colorize)
+            die("cannot use both --raw and --no-color.");
     }
+
     if (linesize == 0)
         linesize = 16;
     if (groupsize == 0)
         groupsize = linesize;
+    hexwidth = 2 * linesize + (linesize + groupsize - 1) / groupsize;
+
     if (optind < argc)
         s->filenames = argv + optind;
 }
