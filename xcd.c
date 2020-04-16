@@ -757,7 +757,7 @@ static void dumpfileswithautoskip(state *s, int pos)
 {
     byte    line[256];
     int     linesheld = 0, lastheldsize = 0, holdpos = 0;
-    int     nonzero, ch, n;
+    int     nonzero, ch = 0, n;
 
     while (ch != EOF && s->maxinputlen > 0) {
         nonzero = 0;
