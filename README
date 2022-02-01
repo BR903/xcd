@@ -8,8 +8,19 @@ The source code also provides a very simple example of using the
 tinfo library to inject control codes into standard output, without
 having to conform to curses's presentation-based API.
 
+In order to colorize its output, this program needs to be run on a
+terminal capable of displaying 256 colors. Because there is no
+portable way of querying the color palette, the program assumes that
+the terminal's palette matches the standard palette of xterm-256color.
+
+(If xcd claims that your terminal does not have 256 colors, try
+setting the TERM environment variable to "xterm-256color". If the
+resulting output is garbled, then try using it with a different
+terminal.)
+
   Building and Installing
 
-To build, simply run "make". The resulting executable runs standalone.
-If you wish to install the program to a shared location, just use
-cp(1).
+There is no configure script. To build, simply run "make". The
+existing executable runs standalone. To install, run "make install".
+By default the makefile installs xcd under /usr/local, but you can
+override this by change the value of the PREFIX variable.

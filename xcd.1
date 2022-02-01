@@ -1,0 +1,87 @@
+.TH XCD 1 "Mar 2019" "colorized hexdump"
+.LO 1
+.SH NAME
+xcd \- produce a hex dump in color
+.SH SYNOPSIS
+.B xcd
+[OPTIONS] [FILE ...]
+.SH DESCRIPTION
+.B xcd
+generates a colorized hex dump of its input file(s). Its output is
+similar to
+.BR xxd (1),
+except that bytes are assigned colors, making it easier to see
+patterns of repeated values.
+.SH OPTIONS
+If no input file is given, or is specified as "\fB-\fR", then
+.B xcd
+reads from standard input.
+.TP
+\fB\-a\fR, \fB\-\-autoskip\fR
+Enable autoskip: sections of the input consisting entirely of zero
+bytes will be omitted from the output, replaced by a line containing a
+lone asterisk.
+.TP
+\fB\-A\fR, \fB\-\-ascii\fR
+Force ASCII-only output. By default,
+.B xcd
+will display Unicode characters in the text column. When this option
+is specified, all non-printing non-ASCII byte values are represented
+by a dot.
+.TP
+\fB\-c\fR, \fB\-\-count\fR=\fIN\fR
+Set the number of bytes per line of output to
+.IR N .
+The default is 16.
+.TP
+\fB\-g\fR, \fB\-\-group\fR=\fIN\fR
+Set the number of bytes to output as a group to
+.IR N .
+Groups are separated from each other by whitespace. Specify a group
+size of zero to disable grouping. The default is 2.
+.TP
+\fB\-l\fR, \fB\-\-limit\fR=\fIN\fR
+Stop reading input after
+.I N
+bytes.
+.TP
+\fB\-N\fR, \fB--no-color\fR
+Suppress all color output.
+.TP
+\fB\-R\fR, \fB--raw\fR
+Suppress the hexadecimal output. Instead, the input is colorized and
+dumped directly to the output.
+.TP
+\fB\-s\fR, \fB\-\-start\fR=\fIN\fR
+Start after
+.I N
+bytes of input, skipping over the previous bytes.
+.TP
+.B \--help
+Display help and exit.
+.TP
+.B \--version
+Display version information and exit.
+.SH NOTE ON COLORS
+.P
+In order to colorize the output,
+.B xcd
+requires a terminal capable of displaying 256 colors.
+.B xcd
+will assign colors attempting to maximize contrast, under the
+assumption that the terminal's color palette matches that of the
+standard "xterm-256color" terminal.
+.SH COPYRIGHT
+Copyright \(co 2018 Brian Raiter
+.IR <breadbox@muppetlabs.com> .
+.P
+.BR xcd \'s
+home page is at
+<\fIhttp://www.muppetlabs.com/~breadbox/software/xcd.html\fR>.
+.P
+This program is free software: you may deal in this software without
+restriction, provided that the copyright and permission notices are
+included. See the program's license for details.
+.SH SEE ALSO
+.IR xxd (1).
+
